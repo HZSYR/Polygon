@@ -193,11 +193,13 @@
         border-radius: 10px;
         border: 1px solid #dee2e6;
         transition: all 0.3s ease;
+        cursor: pointer;
       }
 
       .province-card:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        border-color: #667eea;
       }
 
       .province-name {
@@ -256,6 +258,147 @@
         border: 1px solid #f5c6cb;
         color: #721c24;
       }
+
+      /* Modal Styles */
+      .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(5px);
+      }
+
+      .modal-content {
+        background-color: #fefefe;
+        margin: 5% auto;
+        padding: 0;
+        border: none;
+        width: 90%;
+        max-width: 800px;
+        border-radius: 15px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        animation: modalFadeIn 0.3s ease;
+      }
+
+      @keyframes modalFadeIn {
+        from {
+          transform: translateY(-50px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      .modal-header {
+        padding: 20px 30px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border-radius: 15px 15px 0 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .modal-header h2 {
+        margin: 0;
+        font-size: 1.5em;
+      }
+
+      .close {
+        color: white;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+      }
+
+      .close:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+        transform: rotate(90deg);
+      }
+
+      .modal-body {
+        padding: 30px;
+      }
+
+      .geometry-info {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+      }
+
+      .geometry-type {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 10px;
+        font-size: 1.1em;
+      }
+
+      .coordinate-count {
+        color: #6c757d;
+        margin-bottom: 15px;
+      }
+
+      .coordinates-container {
+        background: #fff;
+        border: 2px solid #dee2e6;
+        border-radius: 10px;
+        padding: 20px;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+
+      .coordinate-section {
+        margin-bottom: 20px;
+      }
+
+      .coordinate-section h4 {
+        color: #495057;
+        margin-bottom: 10px;
+        font-size: 1.1em;
+      }
+
+      .coordinate-list {
+        font-family: "Courier New", monospace;
+        font-size: 12px;
+        line-height: 1.6;
+        color: #333;
+      }
+
+      .copy-button {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        margin-top: 15px;
+        transition: all 0.3s ease;
+      }
+
+      .copy-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+      }
+
+      .copy-button.copied {
+        background: linear-gradient(135deg, #28a745, #20c997);
+      }
     </style>
   </head>
   <body>
@@ -311,7 +454,7 @@
         </div>
 
         <div class="preview">
-          <h3>👀 Preview Provinsi</h3>
+          <h3>👀 Preview Provinsi (Klik untuk melihat polygon)</h3>
           <div class="province-grid" id="provinceGrid"></div>
         </div>
 
@@ -332,9 +475,30 @@
       </div>
     </div>
 
+    <!-- Modal untuk menampilkan polygon -->
+    <div id="polygonModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="modalTitle">Polygon Coordinates</h2>
+          <span class="close" onclick="closeModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+          <div class="geometry-info">
+            <div class="geometry-type" id="geometryType"></div>
+            <div class="coordinate-count" id="coordinateCount"></div>
+          </div>
+          <div class="coordinates-container" id="coordinatesContainer"></div>
+          <button class="copy-button" onclick="copyCoordinates()">
+            📋 Copy Coordinates
+          </button>
+        </div>
+      </div>
+    </div>
+
     <script>
       let provinceData = null;
       let geoJsonData = null;
+      let currentPolygonData = null;
 
       function showAlert(message, type = "success") {
         const alertContainer = document.getElementById("alert-container");
@@ -480,9 +644,10 @@
         const grid = document.getElementById("provinceGrid");
         grid.innerHTML = "";
 
-        provinceData.forEach((province) => {
+        provinceData.forEach((province, index) => {
           const card = document.createElement("div");
           card.className = "province-card";
+          card.onclick = () => showPolygonModal(province);
           card.innerHTML = `
                     <div class="province-name">${province.name}</div>
                     <div class="province-code">Kode: ${province.code}</div>
@@ -490,6 +655,132 @@
           grid.appendChild(card);
         });
       }
+
+      function showPolygonModal(province) {
+        const modal = document.getElementById("polygonModal");
+        const modalTitle = document.getElementById("modalTitle");
+        const geometryType = document.getElementById("geometryType");
+        const coordinateCount = document.getElementById("coordinateCount");
+        const coordinatesContainer = document.getElementById(
+          "coordinatesContainer"
+        );
+
+        // Set modal title
+        modalTitle.textContent = `Polygon Coordinates - ${province.name}`;
+
+        // Get geometry information
+        const geometry = province.geometry;
+        currentPolygonData = geometry;
+
+        if (!geometry) {
+          coordinatesContainer.innerHTML = "<p>No geometry data available</p>";
+          modal.style.display = "block";
+          return;
+        }
+
+        // Display geometry type
+        geometryType.textContent = `Geometry Type: ${geometry.type}`;
+
+        // Process coordinates based on geometry type
+        let coordinatesHTML = "";
+        let totalPoints = 0;
+
+        if (geometry.type === "Polygon") {
+          geometry.coordinates.forEach((ring, ringIndex) => {
+            coordinatesHTML += `<div class="coordinate-section">`;
+            coordinatesHTML += `<h4>${
+              ringIndex === 0 ? "Outer Ring" : `Hole ${ringIndex}`
+            } (${ring.length} points)</h4>`;
+            coordinatesHTML += `<div class="coordinate-list">`;
+
+            ring.forEach((coord, i) => {
+              coordinatesHTML += `[${coord[0].toFixed(6)}, ${coord[1].toFixed(
+                6
+              )}]`;
+              if (i < ring.length - 1) coordinatesHTML += ",<br>";
+              totalPoints++;
+            });
+
+            coordinatesHTML += `</div></div>`;
+          });
+        } else if (geometry.type === "MultiPolygon") {
+          geometry.coordinates.forEach((polygon, polygonIndex) => {
+            coordinatesHTML += `<div class="coordinate-section">`;
+            coordinatesHTML += `<h4>Polygon ${polygonIndex + 1}</h4>`;
+
+            polygon.forEach((ring, ringIndex) => {
+              coordinatesHTML += `<div style="margin-left: 20px; margin-top: 10px;">`;
+              coordinatesHTML += `<strong>${
+                ringIndex === 0 ? "Outer Ring" : `Hole ${ringIndex}`
+              } (${ring.length} points)</strong><br>`;
+              coordinatesHTML += `<div class="coordinate-list">`;
+
+              ring.forEach((coord, i) => {
+                coordinatesHTML += `[${coord[0].toFixed(6)}, ${coord[1].toFixed(
+                  6
+                )}]`;
+                if (i < ring.length - 1) coordinatesHTML += ",<br>";
+                totalPoints++;
+              });
+
+              coordinatesHTML += `</div></div>`;
+            });
+
+            coordinatesHTML += `</div>`;
+          });
+        } else {
+          coordinatesHTML = `<p>Geometry type "${geometry.type}" is not supported for display</p>`;
+        }
+
+        coordinateCount.textContent = `Total Points: ${totalPoints}`;
+        coordinatesContainer.innerHTML = coordinatesHTML;
+
+        // Show modal
+        modal.style.display = "block";
+      }
+
+      function closeModal() {
+        const modal = document.getElementById("polygonModal");
+        modal.style.display = "none";
+      }
+
+      function copyCoordinates() {
+        if (!currentPolygonData) return;
+
+        const coordsText = JSON.stringify(
+          currentPolygonData.coordinates,
+          null,
+          2
+        );
+
+        // Create temporary textarea
+        const textarea = document.createElement("textarea");
+        textarea.value = coordsText;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+
+        // Update button text
+        const copyBtn = document.querySelector(".copy-button");
+        copyBtn.textContent = "✅ Copied!";
+        copyBtn.classList.add("copied");
+
+        setTimeout(() => {
+          copyBtn.textContent = "📋 Copy Coordinates";
+          copyBtn.classList.remove("copied");
+        }, 2000);
+
+        showAlert("Coordinates copied to clipboard!");
+      }
+
+      // Close modal when clicking outside
+      window.onclick = function (event) {
+        const modal = document.getElementById("polygonModal");
+        if (event.target == modal) {
+          closeModal();
+        }
+      };
 
       function exportAsSQL() {
         if (!provinceData) {
