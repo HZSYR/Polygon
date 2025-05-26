@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GeoJSON to Database Converter</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 20px;
+        padding: 30px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(10px);
+      }
+
+      h1 {
+        text-align: center;
+        color: #333;
+        margin-bottom: 30px;
+        font-size: 2.5em;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .input-section {
+        background: #f8f9fa;
+        padding: 25px;
+        border-radius: 15px;
+        margin-bottom: 30px;
+        border: 2px solid #e9ecef;
+      }
+
+      .input-group {
+        margin-bottom: 20px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: #495057;
+      }
+
+      input[type="url"],
+      input[type="file"] {
+        width: 100%;
+        padding: 12px 15px;
+        border: 2px solid #dee2e6;
+        border-radius: 10px;
+        font-size: 16px;
+        transition: all 0.3s ease;
+      }
+
+      input[type="url"]:focus,
+      input[type="file"]:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+
+      .button-group {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+      }
+
+      button {
+        padding: 12px 25px;
+        border: none;
+        border-radius: 10px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+      }
+
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+      }
+
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .loading {
+        display: none;
+        text-align: center;
+        margin: 20px 0;
+        color: #667eea;
+        font-weight: 600;
+      }
+
+      .spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-right: 10px;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .results {
+        margin-top: 30px;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+      }
+
+      .stat-card {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        padding: 20px;
+        border-radius: 15px;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+      }
+
+      .stat-number {
+        font-size: 2em;
+        font-weight: bold;
+        margin-bottom: 5px;
+      }
+
+      .stat-label {
+        font-size: 0.9em;
+        opacity: 0.9;
+      }
+
+      .preview {
+        background: #f8f9fa;
+        border: 2px solid #e9ecef;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+      }
+
+      .preview h3 {
+        color: #495057;
+        margin-bottom: 15px;
+        font-size: 1.3em;
+      }
+
+      .province-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 15px;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+
+      .province-card {
+        background: white;
+        padding: 15px;
+        border-radius: 10px;
+        border: 1px solid #dee2e6;
+        transition: all 0.3s ease;
+      }
+
+      .province-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      }
+
+      .province-name {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 5px;
+      }
+
+      .province-code {
+        color: #6c757d;
+        font-size: 0.9em;
+      }
+
+      .export-section {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
+      }
+
+      .export-btn {
+        background: linear-gradient(135deg, #28a745, #20c997);
+      }
+
+      .export-btn:hover {
+        box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+      }
+
+      textarea {
+        width: 100%;
+        height: 300px;
+        padding: 15px;
+        border: 2px solid #dee2e6;
+        border-radius: 10px;
+        font-family: "Courier New", monospace;
+        font-size: 12px;
+        resize: vertical;
+        margin-top: 10px;
+      }
+
+      .alert {
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        font-weight: 500;
+      }
+
+      .alert-success {
+        background-color: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+      }
+
+      .alert-error {
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🗺️ GeoJSON to Database Converter</h1>
+
+      <div class="input-section">
+        <div class="input-group">
+          <label for="geojsonUrl">URL GeoJSON:</label>
+          <input
+            type="url"
+            id="geojsonUrl"
+            value="https://raw.githubusercontent.com/ardian28/GeoJson-Indonesia-38-Provinsi/main/Provinsi/38%20Provinsi%20Indonesia%20-%20Provinsi.json"
+            placeholder="Masukkan URL file GeoJSON"
+          />
+        </div>
+
+        <div class="input-group">
+          <label for="geojsonFile">Atau Upload File GeoJSON:</label>
+          <input type="file" id="geojsonFile" accept=".json,.geojson" />
+        </div>
+
+        <div class="button-group">
+          <button onclick="loadFromUrl()">📡 Load dari URL</button>
+          <button onclick="loadFromFile()">📁 Load dari File</button>
+          <button onclick="loadDefaultData()">
+            🇮🇩 Load Data Indonesia Default
+          </button>
+        </div>
+      </div>
+
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        Memproses data...
+      </div>
+
+      <div id="alert-container"></div>
+
+      <div class="results" id="results" style="display: none">
+        <div class="stats">
+          <div class="stat-card">
+            <div class="stat-number" id="totalProvinces">0</div>
+            <div class="stat-label">Total Provinsi</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="totalFeatures">0</div>
+            <div class="stat-label">Total Features</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="dataSize">0 KB</div>
+            <div class="stat-label">Ukuran Data</div>
+          </div>
+        </div>
+
+        <div class="preview">
+          <h3>👀 Preview Provinsi</h3>
+          <div class="province-grid" id="provinceGrid"></div>
+        </div>
+
+        <div class="export-section">
+          <button class="export-btn" onclick="exportAsSQL()">
+            💾 Export SQL
+          </button>
+          <button class="export-btn" onclick="exportAsJSON()">
+            📄 Export JSON
+          </button>
+          <button class="export-btn" onclick="exportAsCSV()">
+            📊 Export CSV
+          </button>
+          <button class="export-btn" onclick="exportAsJavaScript()">
+            ⚡ Export JavaScript
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let provinceData = null;
+      let geoJsonData = null;
+
+      function showAlert(message, type = "success") {
+        const alertContainer = document.getElementById("alert-container");
+        const alert = document.createElement("div");
+        alert.className = `alert alert-${type}`;
+        alert.textContent = message;
+        alertContainer.innerHTML = "";
+        alertContainer.appendChild(alert);
+
+        setTimeout(() => {
+          alertContainer.innerHTML = "";
+        }, 5000);
+      }
+
+      function showLoading(show) {
+        document.getElementById("loading").style.display = show
+          ? "block"
+          : "none";
+      }
+
+      async function loadFromUrl() {
+        const url = document.getElementById("geojsonUrl").value.trim();
+        if (!url) {
+          showAlert("Masukkan URL yang valid!", "error");
+          return;
+        }
+
+        showLoading(true);
+        try {
+          // Convert GitHub URL to raw content URL if needed
+          let rawUrl = url;
+          if (
+            url.includes("github.com") &&
+            !url.includes("raw.githubusercontent.com")
+          ) {
+            rawUrl = url
+              .replace("github.com", "raw.githubusercontent.com")
+              .replace("/blob/", "/");
+          }
+
+          const response = await fetch(rawUrl);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+          processGeoJsonData(data);
+          showAlert("Data berhasil dimuat dari URL!");
+        } catch (error) {
+          showAlert(`Error loading dari URL: ${error.message}`, "error");
+        } finally {
+          showLoading(false);
+        }
+      }
+
+      function loadFromFile() {
+        const fileInput = document.getElementById("geojsonFile");
+        const file = fileInput.files[0];
+
+        if (!file) {
+          showAlert("Pilih file GeoJSON terlebih dahulu!", "error");
+          return;
+        }
+
+        showLoading(true);
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          try {
+            const data = JSON.parse(e.target.result);
+            processGeoJsonData(data);
+            showAlert("Data berhasil dimuat dari file!");
+          } catch (error) {
+            showAlert(`Error parsing file: ${error.message}`, "error");
+          } finally {
+            showLoading(false);
+          }
+        };
+        reader.readAsText(file);
+      }
+
+      async function loadDefaultData() {
+        showLoading(true);
+        try {
+          const url =
+            "https://raw.githubusercontent.com/ardian28/GeoJson-Indonesia-38-Provinsi/main/Provinsi/38%20Provinsi%20Indonesia%20-%20Provinsi.json";
+          const response = await fetch(url);
+          const data = await response.json();
+          processGeoJsonData(data);
+          showAlert("Data provinsi Indonesia berhasil dimuat!");
+        } catch (error) {
+          showAlert(`Error loading default data: ${error.message}`, "error");
+        } finally {
+          showLoading(false);
+        }
+      }
+
+      function processGeoJsonData(data) {
+        geoJsonData = data;
+        provinceData = [];
+
+        if (data.type === "FeatureCollection" && data.features) {
+          data.features.forEach((feature, index) => {
+            const properties = feature.properties || {};
+            const geometry = feature.geometry;
+
+            const province = {
+              id: index + 1,
+              name:
+                properties.PROVINSI ||
+                properties.NAME_1 ||
+                properties.name ||
+                `Provinsi ${index + 1}`,
+              code:
+                properties.KODE ||
+                properties.ID_1 ||
+                properties.code ||
+                `P${String(index + 1).padStart(2, "0")}`,
+              geometry: geometry,
+              properties: properties,
+            };
+
+            provinceData.push(province);
+          });
+        }
+
+        displayResults();
+      }
+
+      function displayResults() {
+        const resultsDiv = document.getElementById("results");
+        resultsDiv.style.display = "block";
+
+        // Update statistics
+        document.getElementById("totalProvinces").textContent =
+          provinceData.length;
+        document.getElementById("totalFeatures").textContent =
+          geoJsonData.features ? geoJsonData.features.length : 0;
+        document.getElementById("dataSize").textContent = `${Math.round(
+          JSON.stringify(geoJsonData).length / 1024
+        )} KB`;
+
+        // Display province grid
+        const grid = document.getElementById("provinceGrid");
+        grid.innerHTML = "";
+
+        provinceData.forEach((province) => {
+          const card = document.createElement("div");
+          card.className = "province-card";
+          card.innerHTML = `
+                    <div class="province-name">${province.name}</div>
+                    <div class="province-code">Kode: ${province.code}</div>
+                `;
+          grid.appendChild(card);
+        });
+      }
+
+      function exportAsSQL() {
+        if (!provinceData) {
+          showAlert("Tidak ada data untuk di-export!", "error");
+          return;
+        }
+
+        let sql = `-- Database Provinsi Indonesia
+-- Generated on ${new Date().toLocaleString()}
+
+CREATE TABLE provinces (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    code VARCHAR(10) NOT NULL UNIQUE,
+    geometry LONGTEXT,
+    properties JSON,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO provinces (name, code, geometry, properties) VALUES\n`;
+
+        const values = provinceData.map((province) => {
+          const geometry = JSON.stringify(province.geometry).replace(
+            /'/g,
+            "''"
+          );
+          const properties = JSON.stringify(province.properties).replace(
+            /'/g,
+            "''"
+          );
+          return `('${province.name.replace(/'/g, "''")}', '${
+            province.code
+          }', '${geometry}', '${properties}')`;
+        });
+
+        sql += values.join(",\n") + ";";
+
+        downloadFile("provinces_database.sql", sql);
+        showAlert("Database SQL berhasil di-export!");
+      }
+
+      function exportAsJSON() {
+        if (!provinceData) {
+          showAlert("Tidak ada data untuk di-export!", "error");
+          return;
+        }
+
+        const jsonData = {
+          metadata: {
+            title: "Database Provinsi Indonesia",
+            total_provinces: provinceData.length,
+            generated_at: new Date().toISOString(),
+            format: "GeoJSON Database",
+          },
+          provinces: provinceData,
+        };
+
+        downloadFile(
+          "provinces_database.json",
+          JSON.stringify(jsonData, null, 2)
+        );
+        showAlert("Database JSON berhasil di-export!");
+      }
+
+      function exportAsCSV() {
+        if (!provinceData) {
+          showAlert("Tidak ada data untuk di-export!", "error");
+          return;
+        }
+
+        let csv = "ID,Name,Code,Geometry,Properties\n";
+
+        provinceData.forEach((province) => {
+          const geometry = JSON.stringify(province.geometry).replace(
+            /"/g,
+            '""'
+          );
+          const properties = JSON.stringify(province.properties).replace(
+            /"/g,
+            '""'
+          );
+          csv += `${province.id},"${province.name}","${province.code}","${geometry}","${properties}"\n`;
+        });
+
+        downloadFile("provinces_database.csv", csv);
+        showAlert("Database CSV berhasil di-export!");
+      }
+
+      function exportAsJavaScript() {
+        if (!provinceData) {
+          showAlert("Tidak ada data untuk di-export!", "error");
+          return;
+        }
+
+        const jsCode = `// Database Provinsi Indonesia
+// Generated on ${new Date().toLocaleString()}
+
+const PROVINCES_DATABASE = {
+    metadata: {
+        title: "Database Provinsi Indonesia",
+        totalProvinces: ${provinceData.length},
+        generatedAt: "${new Date().toISOString()}",
+        format: "JavaScript Object"
+    },
+    
+    // Array of all provinces
+    provinces: ${JSON.stringify(provinceData, null, 8)},
+    
+    // Helper methods
+    getProvinceById: function(id) {
+        return this.provinces.find(p => p.id === id);
+    },
+    
+    getProvinceByCode: function(code) {
+        return this.provinces.find(p => p.code === code);
+    },
+    
+    getProvinceByName: function(name) {
+        return this.provinces.find(p => p.name.toLowerCase().includes(name.toLowerCase()));
+    },
+    
+    getAllProvinceNames: function() {
+        return this.provinces.map(p => p.name);
+    },
+    
+    getAllProvinceCodes: function() {
+        return this.provinces.map(p => p.code);
+    },
+    
+    searchProvinces: function(query) {
+        const q = query.toLowerCase();
+        return this.provinces.filter(p => 
+            p.name.toLowerCase().includes(q) || 
+            p.code.toLowerCase().includes(q)
+        );
+    }
+};
+
+// Export for Node.js
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = PROVINCES_DATABASE;
+}
+
+// Export for ES6 modules
+if (typeof export !== 'undefined') {
+    export default PROVINCES_DATABASE;
+}`;
+
+        downloadFile("provinces_database.js", jsCode);
+        showAlert("Database JavaScript berhasil di-export!");
+      }
+
+      function downloadFile(filename, content) {
+        const blob = new Blob([content], { type: "text/plain" });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }
+
+      // Load default data on page load
+      window.addEventListener("load", function () {
+        setTimeout(loadDefaultData, 1000);
+      });
+    </script>
+  </body>
+</html>
